@@ -124,6 +124,31 @@ class Main(Star):
         mode = self.config.get("pull_mode", "ff-only")
         return mode if mode in PULL_ARGS else "ff-only"
 
+    # ---- 状态查询(含上游更新) ----
+    async def _status_line(self, item: dict) -> str:
+        path = item["path"]
+        branch = (await self._git(path, "rev-parse", "--abbrev-ref", "HEAD"))[1] or "?"
+        sha = (await self._git(path, "rev-parse", "--short", "HEAD"))[1] or "?"
+        loaded = "已加载" if item["star"] else "未加载"
+
+        urc, _, _ = await self._git(path, "rev-parse", "--abbrev-ref", "@{u}")
+        if urc != 0:
+            up = "⚠ 无上游"
+        elif (await self._git(path, "fetch", "--quiet"))[0] != 0:
+            up = "⚠ fetch 失败"
+        else:
+            behind = (await self._git(path, "rev-list", "--count", "HEAD..@{u}"))[1]
+            ahead = (await self._git(path, "rev-list", "--count", "@{u}..HEAD"))[1]
+            if behind and behind != "0":
+                up = f"⬆ 可更新 {behind} 个 commit"
+                if ahead and ahead != "0":
+                    up += f"(本地领先 {ahead})"
+            elif ahead and ahead != "0":
+                up = f"本地领先 {ahead} 个 commit"
+            else:
+                up = "✅ 已是最新"
+        return f"• {item['dir']} [{branch}@{sha}] {loaded} {up}"
+
     # ---- 指令 ----
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("gitsync")
@@ -136,17 +161,15 @@ class Main(Star):
             yield event.plain_result("未发现任何含 .git 的插件。")
             return
 
-        # /gitsync 或 /gitsync list —— 默认只列出,不拉取
+        # /gitsync 或 /gitsync list —— 默认只列出(含上游更新检查),不拉取
         if arg == "" or arg.lower() == "list":
-            lines = ["📋 git 插件(/gitsync all 更新全部):"]
-            for c in candidates:
-                _, branch, _ = await self._git(
-                    c["path"], "rev-parse", "--abbrev-ref", "HEAD"
-                )
-                _, sha, _ = await self._git(c["path"], "rev-parse", "--short", "HEAD")
-                loaded = "已加载" if c["star"] else "未加载"
-                lines.append(f"• {c['dir']} [{branch or '?'}@{sha or '?'}] {loaded}")
-            yield event.plain_result("\n".join(lines))
+            yield event.plain_result(
+                f"正在检查 {len(candidates)} 个 git 插件的上游更新…"
+            )
+            lines = await asyncio.gather(*(self._status_line(c) for c in candidates))
+            yield event.plain_result(
+                "📋 git 插件(/gitsync all 更新全部):\n" + "\n".join(lines)
+            )
             return
 
         # /gitsync all —— 拉取并重载(仅重载有更新的)
