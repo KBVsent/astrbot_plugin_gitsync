@@ -1,0 +1,26 @@
+{
+  "pull_mode": {
+    "description": "git pull 方式",
+    "type": "string",
+    "default": "ff-only",
+    "options": ["ff-only", "merge", "rebase"],
+    "hint": "ff-only 遇分叉直接失败(最安全);merge 合并;rebase 变基"
+  },
+  "reinstall_deps": {
+    "description": "更新后自动重装依赖",
+    "type": "bool",
+    "default": true,
+    "hint": "检测到 requirements.txt 变化时自动安装缺失依赖"
+  },
+  "exclude": {
+    "description": "额外跳过的插件目录名",
+    "type": "list",
+    "default": [],
+    "hint": "填目录名,自身已自动排除"
+  },
+  "git_timeout": {
+    "description": "单次 git 操作超时(秒)",
+    "type": "int",
+    "default": 120
+  }
+}

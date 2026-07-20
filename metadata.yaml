@@ -1,0 +1,4 @@
+name: astrbot_plugin_gitsync
+desc: 一条指令拉取并热重载所有 git 管理的插件
+author: KBVsent
+version: 1.0.0
